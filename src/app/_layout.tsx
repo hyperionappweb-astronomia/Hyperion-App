@@ -1,18 +1,61 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Stack } from 'expo-router'
+import { ActivityIndicator, View } from 'react-native'
+import { AuthProvider, useAuth } from '../contexts/AuthContext'
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+function RootNavigator() {
+  const { session, loading, recovering } = useAuth()
 
-SplashScreen.preventAutoHideAsync();
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    )
+  }
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
-  );
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={!!session && !recovering}>
+        <Stack.Screen name="index" />
+        <Stack.Screen
+          name="conta"
+          options={{ headerShown: true, title: 'Minha conta' }}
+        />
+        <Stack.Screen
+          name="conteudos"
+          options={{headerShown: true, title: 'Conteúdos'}}
+        />
+        <Stack.Screen 
+          name="questoes" 
+          options={{ headerShown: true, title: 'Questões' }}
+        />
+        <Stack.Screen 
+          name="simulados" 
+          options={{ headerShown: true, title: 'Simulados' }} 
+        />
+        <Stack.Screen 
+          name="simulado/[id]" 
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen 
+          name="simulado/[id]/resultado" 
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+      </Stack.Protected>
+      <Stack.Protected guard={!session}>
+        <Stack.Screen name="login" />
+      </Stack.Protected>
+      <Stack.Protected guard={recovering}>
+        <Stack.Screen name="reset-password" />
+      </Stack.Protected>
+    </Stack>
+  )
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
+  )
 }
