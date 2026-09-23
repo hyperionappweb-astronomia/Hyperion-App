@@ -1,7 +1,8 @@
 import ConfirmHcaptcha from '@hcaptcha/react-native-hcaptcha'
 import * as Linking from 'expo-linking'
 import { useRef, useState } from 'react'
-import { Alert, Button, ScrollView, Text, TextInput } from 'react-native'
+import { Button, ScrollView, Text, TextInput } from 'react-native'
+import AvisoModal from '../components/AvisoModal'
 import {
   SENHA_MIN,
   traduzErro,
@@ -14,12 +15,20 @@ import { supabase } from '../services/supabase'
 // Ative no app e no painel do Supabase AO MESMO TEMPO (ver instruções).
 const HCAPTCHA_SITEKEY = process.env.EXPO_PUBLIC_HCAPTCHA_SITEKEY
 
+type Aviso = { titulo: string; mensagem: string; tipo?: 'aviso' | 'erro' }
+
 export default function Login() {
   const [modo, setModo] = useState<'entrar' | 'cadastrar'>('entrar')
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Um popup só, reaproveitado por toda a tela (Alert.alert não aparece na web)
+  const [aviso, setAviso] = useState<Aviso | null>(null)
+  function avisar(titulo: string, mensagem: string, tipo: 'aviso' | 'erro' = 'erro') {
+    setAviso({ titulo, mensagem, tipo })
+  }
 
   // ---------- CAPTCHA (invisível; só aparece desafio se necessário) ----------
   const captchaRef = useRef<any>(null)
@@ -51,7 +60,7 @@ export default function Login() {
   async function comCaptcha(): Promise<{ ok: boolean; token?: string }> {
     const token = await obterCaptcha()
     if (token === null) {
-      Alert.alert('Erro', 'Verificação de segurança não concluída. Tente novamente.')
+      avisar('Erro', 'Verificação de segurança não concluída. Tente novamente.')
       return { ok: false }
     }
     return { ok: true, token }
@@ -60,8 +69,8 @@ export default function Login() {
   // ---------- Ações ----------
   async function entrar() {
     const erroEmail = validarEmail(email)
-    if (erroEmail) return Alert.alert('Erro', erroEmail)
-    if (!password) return Alert.alert('Erro', 'Digite sua senha.')
+    if (erroEmail) return avisar('Erro', erroEmail)
+    if (!password) return avisar('Erro', 'Digite sua senha.')
 
     setLoading(true)
     const captcha = await comCaptcha()
@@ -72,15 +81,15 @@ export default function Login() {
       password,
       options: { captchaToken: captcha.token },
     })
-    if (error) Alert.alert('Erro', traduzErro(error))
+    if (error) avisar('Erro', traduzErro(error))
     setLoading(false)
   }
 
   async function cadastrar() {
     const nomeLimpo = nome.trim()
-    if (!nomeLimpo) return Alert.alert('Erro', 'Digite seu nome.')
+    if (!nomeLimpo) return avisar('Erro', 'Digite seu nome.')
     const erro = validarEmail(email) ?? validarSenha(password)
-    if (erro) return Alert.alert('Erro', erro)
+    if (erro) return avisar('Erro', erro)
 
     setLoading(true)
     const captcha = await comCaptcha()
@@ -92,18 +101,19 @@ export default function Login() {
       password,
       options: { data: { nome: nomeLimpo }, captchaToken: captcha.token },
     })
-    if (error) Alert.alert('Erro', traduzErro(error))
+    if (error) avisar('Erro', traduzErro(error))
     else if (!data.session)
-      Alert.alert(
+      avisar(
         'Confirme seu email',
-        `Enviamos um link de confirmação para ${emailLimpo}.`
+        `Enviamos um link de confirmação para ${emailLimpo}. Você precisa clicar nele antes de conseguir entrar.`,
+        'aviso'
       )
     setLoading(false)
   }
 
   async function esqueciSenha() {
     const erroEmail = validarEmail(email)
-    if (erroEmail) return Alert.alert('Erro', 'Digite seu email primeiro.')
+    if (erroEmail) return avisar('Erro', 'Digite seu email primeiro.')
 
     setLoading(true)
     const captcha = await comCaptcha()
@@ -116,11 +126,12 @@ export default function Login() {
       email.trim().toLowerCase(),
       { redirectTo, captchaToken: captcha.token }
     )
-    if (error) Alert.alert('Erro', traduzErro(error))
+    if (error) avisar('Erro', traduzErro(error))
     else
-      Alert.alert(
+      avisar(
         'Verifique seu email',
-        'Se esse email estiver cadastrado, enviaremos um link para redefinir a senha.'
+        'Se esse email estiver cadastrado, enviaremos um link para redefinir a senha.',
+        'aviso'
       )
     setLoading(false)
   }
@@ -207,6 +218,14 @@ export default function Login() {
           onMessage={onCaptchaMessage}
         />
       ) : null}
+
+      <AvisoModal
+        visible={!!aviso}
+        titulo={aviso?.titulo ?? ''}
+        mensagem={aviso?.mensagem ?? ''}
+        tipo={aviso?.tipo}
+        onFechar={() => setAviso(null)}
+      />
     </ScrollView>
   )
 }

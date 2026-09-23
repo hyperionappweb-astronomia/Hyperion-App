@@ -1,21 +1,29 @@
 import { useState } from 'react'
-import { Alert, Button, Text, TextInput, View } from 'react-native'
+import { Button, Text, TextInput, View } from 'react-native'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
+import AvisoModal from '../components/AvisoModal'
+
+type Aviso = { titulo: string; mensagem: string; tipo?: 'aviso' | 'erro' }
 
 export default function ResetPassword() {
   const { finishRecovery } = useAuth()
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Um popup só, reaproveitado por toda a tela (Alert.alert não aparece na web)
+  const [aviso, setAviso] = useState<Aviso | null>(null)
+  function avisar(titulo: string, mensagem: string, tipo: 'aviso' | 'erro' = 'erro') {
+    setAviso({ titulo, mensagem, tipo })
+  }
+
   async function salvar() {
-    if (password.length < 6)
-      return Alert.alert('Erro', 'A senha precisa ter ao menos 6 caracteres.')
+    if (password.length < 6) return avisar('Erro', 'A senha precisa ter ao menos 6 caracteres.')
     setLoading(true)
     const { error } = await supabase.auth.updateUser({ password })
     setLoading(false)
-    if (error) return Alert.alert('Erro', error.message)
-    Alert.alert('Pronto', 'Senha atualizada!')
+    if (error) return avisar('Erro', error.message)
+    avisar('Pronto', 'Senha atualizada!', 'aviso')
     finishRecovery() // libera a home
   }
 
@@ -30,6 +38,14 @@ export default function ResetPassword() {
         style={{ borderWidth: 1, padding: 10 }}
       />
       <Button title="Salvar" onPress={salvar} disabled={loading} />
+
+      <AvisoModal
+        visible={!!aviso}
+        titulo={aviso?.titulo ?? ''}
+        mensagem={aviso?.mensagem ?? ''}
+        tipo={aviso?.tipo}
+        onFechar={() => setAviso(null)}
+      />
     </View>
   )
 }

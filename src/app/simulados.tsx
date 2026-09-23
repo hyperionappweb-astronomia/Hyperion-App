@@ -1,8 +1,8 @@
-import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
-import { iniciarSimulado } from '../services/simulados'
+import { useRouter } from 'expo-router'
 import { supabase } from '../services/supabase'
+import { buscarSimuladoEmAndamento, iniciarSimulado } from '../services/simulados'
 
 type Nivel = { id_nivel: number; descricao: string; codigo_nivel: string }
 
@@ -57,6 +57,18 @@ export default function Simulados() {
         { p_id_nivel: nivel.id_nivel, p_quantidade: quantidade }
       )
       if (erroRpc || !idSimulado) {
+        // Já existe um simulado em aberto: o banco recusou antes de sortear
+        // nada. Em vez de travar, leva direto para ele continuar.
+        if (erroRpc?.message?.toLowerCase().includes('andamento')) {
+          const emAndamento = await buscarSimuladoEmAndamento()
+          if (emAndamento) {
+            router.push({
+              pathname: '/simulado/[id]',
+              params: { id: String(emAndamento) },
+            })
+            return
+          }
+        }
         throw new Error(
           erroRpc?.message?.includes('suficientes')
             ? 'Não há questões suficientes cadastradas nesse nível ainda.'
@@ -67,10 +79,7 @@ export default function Simulados() {
       // 2) Abre a tentativa (cria a linha em resultado_simulado)
       const idResultado = await iniciarSimulado(idSimulado)
 
-      // A tela de responder o simulado (com cronômetro e navegação entre
-      // questões) ainda não existe; troque a rota abaixo quando ela existir.
-      router.push({pathname: '/simulado/[id]', params: { id: String(idResultado) },
-})
+      router.push({ pathname: '/simulado/[id]', params: { id: String(idResultado) } })
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível iniciar o simulado.')
     } finally {

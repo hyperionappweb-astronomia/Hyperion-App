@@ -1,6 +1,5 @@
 // Salve como services/useCaptcha.tsx
 import { useRef } from 'react'
-import { Alert } from 'react-native'
 import ConfirmHcaptcha from '@hcaptcha/react-native-hcaptcha'
 
 // Se essa variável não existir no .env, o CAPTCHA fica desligado no app.
@@ -37,12 +36,11 @@ export function useCaptcha() {
     resolver.current = null
   }
 
+  // undefined = captcha desligado | null = cancelado/falhou | string = token
+  // Não mostra nenhum aviso aqui -- quem chamar decide como avisar a pessoa.
   async function comCaptcha(): Promise<{ ok: boolean; token?: string }> {
     const token = await obter()
-    if (token === null) {
-      Alert.alert('Erro', 'Verificação de segurança não concluída. Tente novamente.')
-      return { ok: false }
-    }
+    if (token === null) return { ok: false }
     return { ok: true, token }
   }
 
